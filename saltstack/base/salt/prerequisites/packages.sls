@@ -21,7 +21,6 @@ packages_install:
       - git
       - tmux
   {% endif %}
-      - ntp
   {% if grains['os'] != 'Amazon' %}
       - bash-completion
   {% endif %}
@@ -42,7 +41,6 @@ packages_install:
       - iptables-persistent
       - dnsutils
   {% endif %}
-      - deltarpm
       - nvme-cli
       - openssl
   {% if pillar['OS'] in ('centos7', 'redhat7') %}

@@ -1,3 +1,3 @@
 install_jinja2:
   cmd.run:
-    - name: pip install jinja2
+    - name: python3 -m pip install jinja2

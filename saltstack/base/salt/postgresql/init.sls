@@ -9,16 +9,16 @@
     - source: salt://postgresql/yum/pgdg10-gpg
 {% endif %}
 
-{% if grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7  %}
+{% if grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 8  %}
 install-postgres:
   pkg.installed:
     - pkgs:
-      - postgresql10-server
+      - postgresql-server
       - postgresql-jdbc
-      - postgresql10
-      - postgresql10-contrib
-      - postgresql10-docs
-      - postgresql10-devel
+      - postgresql
+      - postgresql-contrib
+      - postgresql-docs
+      - postgresql-devel
 
 {% elif grains['os_family'] == 'Debian' %}
 install-postgres:

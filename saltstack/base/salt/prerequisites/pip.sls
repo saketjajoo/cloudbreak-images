@@ -31,8 +31,8 @@ update_python_pip3:
 
 install_pyyaml:
   cmd.run:
-    - name: pip install PyYAML --ignore-installed
-    - unless: pip list | grep -E 'PyYAML'
+    - name: python3 -m pip install PyYAML --ignore-installed
+    - unless: python3 -m pip list | grep -E 'PyYAML'
 
 install_jq:
   file.managed:

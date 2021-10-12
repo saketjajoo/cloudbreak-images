@@ -7,24 +7,23 @@ set -ex -o pipefail -o errexit
 
 function install_salt_with_pip() {
   echo "Installing salt with version: $SALT_VERSION"
-  pip install --upgrade pip
-  pip install virtualenv
+  python3 -m pip install --upgrade pip
+  pip3 install virtualenv
 
   # fix pip3 not installing virtualenv for root
-  if [ "${OS}" != "redhat7" ] ; then
+#  if [ "${OS}" != "redhat7" ] ; then
     ln -s /usr/local/bin/virtualenv /usr/bin/virtualenv
-  else
-    echo "source scl_source enable rh-python36; python3.6 -m virtualenv \$@" > /usr/bin/virtualenv
-    chmod +x /usr/bin/virtualenv
-  fi
+#  else
+#    echo "source scl_source enable rh-python36; python3.6 -m virtualenv \$@" > /usr/bin/virtualenv
+#    chmod +x /usr/bin/virtualenv
+#  fi
   mkdir ${SALT_PATH}
   virtualenv ${SALT_PATH}
   source ${SALT_PATH}/bin/activate
   if [ "${OS}" == "redhat7" ] ; then
     # can't install this via salt_requirements.txt and I dunno why...
-    pip install pbr
+    pip3 install pbr
   fi
-  pip install --upgrade pip
   pip install -r /tmp/salt_requirements.txt
 }
 
@@ -67,7 +66,7 @@ function install_nvme-cli () {
 }
 
 function install_with_yum() {
-  yum update -y python
+  yum update -y python3
   yum install -y yum-utils yum-plugin-versionlock
   yum clean metadata
   enable_epel_repository
@@ -89,7 +88,7 @@ function install_with_yum() {
 
 function enable_epel_repository() {
   if [ "${OS}" == "amazonlinux2" ] || [ "${OS}" == "redhat7" ] ; then
-    curl https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm -o epel-release-latest-7.noarch.rpm && yum install --nogpgcheck -y ./epel-release-latest-7.noarch.rpm
+    curl https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm -o epel-release-latest-8.noarch.rpm && yum install --nogpgcheck -y ./epel-release-latest-8.noarch.rpm
   elif [ "${OS}" == "amazonlinux" ] ; then
     yum-config-manager --enable epel
   elif [ "${OS_TYPE}" == "redhat6" ] ; then
@@ -105,11 +104,10 @@ function install_python_pip() {
   elif [ "${OS_TYPE}" == "redhat7" ] || [ "${OS_TYPE}" == "amazonlinux2" ] ; then
     echo "Installing python36 with deps"
     if [ "${OS}" == "redhat7" ] ; then
-      yum-config-manager --enable rhscl
-      yum -y install rh-python36
+      yum install -y python3 python3-pip python3-devel python3-setuptools
       # pip workaround
-      echo "source scl_source enable rh-python36; python3.6 -m pip \$@" > /usr/bin/pip
-      chmod +x /usr/bin/pip
+      # echo "source scl_source enable rh-python36; python3.6 -m pip \$@" > /usr/bin/pip
+      # chmod +x /usr/bin/pip
     else
       yum install -y python36 python36-pip python36-devel python36-setuptools
       make_pip3_default_pip

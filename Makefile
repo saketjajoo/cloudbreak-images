@@ -42,7 +42,7 @@ $(error "AZURE_IMAGE_VHD and Marketplace image properties (AZURE_IMAGE_PUBLISHER
 		ifeq ($(OS),redhat7)
 			AZURE_IMAGE_PUBLISHER ?= RedHat
 			AZURE_IMAGE_OFFER ?= RHEL
-			AZURE_IMAGE_SKU ?= 7_9
+			AZURE_IMAGE_SKU ?= 8-LVM
 		else ifeq ($(OS),centos7)
 			AZURE_IMAGE_PUBLISHER ?= OpenLogic
 			AZURE_IMAGE_OFFER ?= CentOS
@@ -287,7 +287,7 @@ build-azure-redhat7:
 	GIT_REV=$(GIT_REV) \
 	GIT_BRANCH=$(GIT_BRANCH) \
 	GIT_TAG=$(GIT_TAG) \
-	./scripts/packer.sh build -only=arm-redhat7 $(PACKER_OPTS)
+	./scripts/packer.sh build -color=false -only=arm-redhat7 $(PACKER_OPTS)
 ifeq ($(AZURE_INITIAL_COPY),true)
 	TRACE=1 AZURE_STORAGE_ACCOUNTS=$(AZURE_BUILD_STORAGE_ACCOUNT) ./scripts/azure-copy.sh
 endif

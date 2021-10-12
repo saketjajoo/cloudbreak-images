@@ -3,7 +3,7 @@ install_selinux_module_dependecies:
   pkg.installed:
     - pkgs:
       - policycoreutils
-      - policycoreutils-python
+      - python3-policycoreutils
 
 selinux.setenforce:
   module.run:
