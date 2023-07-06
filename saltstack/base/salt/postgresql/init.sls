@@ -15,9 +15,27 @@
 /etc/pki/rpm-gpg/RPM-GPG-KEY-PGDG-11:
   file.managed:
     - source: salt://postgresql/yum/pgdg11-gpg
+
+/etc/yum.repos.d/pgdg14.repo:
+  file.managed:
+    - source: salt://postgresql/yum/postgres14-el7.repo
+
+/etc/pki/rpm-gpg/RPM-GPG-KEY-PGDG-14:
+  file.managed:
+    - source: salt://postgresql/yum/pgdg14-gpg
 {% endif %}
 
-{% if grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7  %}
+{% if pillar['OS'] == 'redhat8' %}
+install-postgres:
+  cmd.run:
+    - name: |
+        dnf -y install https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+        dnf module -y disable postgresql
+        dnf clean all
+        dnf -y install postgresql11-server postgresql11 postgresql11-devel --skip-broken --nobest
+        dnf -y install postgresql14-server postgresql14 postgresql14-devel --skip-broken --nobest
+
+{% elif grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7  %}
 install-postgres:
   pkg.installed:
     - pkgs:
@@ -36,125 +54,17 @@ install-postgres11:
       - postgresql11
       - postgresql11-contrib
       - postgresql11-docs
+      - postgresql11-devel
 
-pgsql-ld-conf:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/postgresql-10-libs.conf
-
-pgsql-psql:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/psql
-
-pgsql-clusterdb:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/clusterdb
-
-pgsql-createdb:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/createdb
-
-pgsql-createuser:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/createuser
-
-pgsql-dropdb:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/dropdb
-
-pgsql-dropuser:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/dropuser
-
-pgsql-pg_basebackup:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/pg_basebackup
-
-pgsql-pg_dump:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/pg_dump
-
-pgsql-pg_dumpall:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/pg_dumpall
-
-pgsql-pg_restore:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/pg_restore
-
-pgsql-reindexdb:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/reindexdb
-
-pgsql-vacuumdb:
-  alternatives.set:
-    - path: /usr/pgsql-10/bin/vacuumdb
-
-pgsql-clusterdbman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/clusterdb.1
-
-pgsql-createdbman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/createdb.1
-
-pgsql-createuserman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/createuser.1
-
-pgsql-dropdbman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/dropdb.1
-
-pgsql-dropuserman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/dropuser.1
-
-pgsql-pg_basebackupman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/pg_basebackup.1
-
-pgsql-pg_dumpman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/pg_dump.1
-
-pgsql-pg_dumpallman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/pg_dumpall.1
-
-pgsql-pg_restoreman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/pg_restore.1
-
-pgsql-psqlman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/psql.1
-
-pgsql-reindexdbman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/reindexdb.1
-
-pgsql-vacuumdbman:
-  alternatives.set:
-    - path: /usr/pgsql-10/share/man/man1/vacuumdb.1
-
-{% elif grains['os_family'] == 'Debian' %}
-install-postgres:
+install-postgres14:
   pkg.installed:
     - pkgs:
-      - postgresql
-      - postgresql-client
-      - libpostgresql-jdbc-java
-{% elif grains['os_family'] == 'Suse' %}
-install-postgres:
-  pkg.installed:
-    - pkgs:
-      - postgresql10
-      - postgresql-init
-      - postgresql10-server
-      - postgresql10-contrib
-      - postgresql10-docs
-      - postgresql10-devel
-      - postgresql-jdbc
+        - postgresql14-server
+        - postgresql-jdbc
+        - postgresql14
+        - postgresql14-contrib
+        - postgresql14-docs
+        - postgresql14-devel
 {% else %}
 remove-old-postgres:
   pkg.removed:
@@ -194,13 +104,132 @@ install-postgres:
 {% endif %}
 {% endif %}
 
+{% if pillar['OS'] == 'redhat8' %}
+  {% set pg_default_version = '11' %}
+{% elif grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7 %}
+  # the override to 11 for runtimes >= 7.2.7 is handled in CB
+  {% set pg_default_version = '10' %}
+{% endif %}
+
+{% if pg_default_version %}
+pgsql-ld-conf:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/postgresql-{{ pg_default_version }}-libs.conf
+
+pgsql-psql:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/psql
+
+pgsql-clusterdb:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/clusterdb
+
+pgsql-createdb:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/createdb
+
+pgsql-createuser:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/createuser
+
+pgsql-dropdb:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/dropdb
+
+pgsql-dropuser:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/dropuser
+
+pgsql-pg_basebackup:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/pg_basebackup
+
+pgsql-pg_dump:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/pg_dump
+
+pgsql-pg_dumpall:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/pg_dumpall
+
+pgsql-pg_restore:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/pg_restore
+
+pgsql-reindexdb:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/reindexdb
+
+pgsql-vacuumdb:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/bin/vacuumdb
+
+pgsql-clusterdbman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/clusterdb.1
+
+pgsql-createdbman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/createdb.1
+
+pgsql-createuserman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/createuser.1
+
+pgsql-dropdbman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/dropdb.1
+
+pgsql-dropuserman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/dropuser.1
+
+pgsql-pg_basebackupman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/pg_basebackup.1
+
+pgsql-pg_dumpman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/pg_dump.1
+
+pgsql-pg_dumpallman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/pg_dumpall.1
+
+pgsql-pg_restoreman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/pg_restore.1
+
+pgsql-psqlman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/psql.1
+
+pgsql-reindexdbman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/reindexdb.1
+
+pgsql-vacuumdbman:
+  alternatives.set:
+    - path: /usr/pgsql-{{ pg_default_version }}/share/man/man1/vacuumdb.1
+
 /usr/bin/initdb:
   file.symlink:
     - mode: 755
-    - target: /usr/pgsql-10/bin/initdb
+    - target: /usr/pgsql-{{ pg_default_version }}/bin/initdb
     - force: True
+{% endif %}
 
-{% if  pillar['OS'] == 'amazonlinux2' or ( grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7 ) %}
+{% if pillar['OS'] == 'redhat8' %}
+
+init-pg-database:
+  cmd.run:
+    - name: /usr/pgsql-11/bin/postgresql-11-setup initdb
+
+reenable-postgres:
+  cmd.run:
+    - name: systemctl enable --now postgresql-11
+
+{% elif  grains['os_family'] == 'RedHat' and grains['osmajorrelease'] | int == 7 %}
 /var/lib/pgsql/data:
   file.symlink:
       - target: /var/lib/pgsql/10/data
@@ -222,7 +251,7 @@ systemd-link:
     - unless: cat /usr/lib/systemd/system/postgresql-10.service | grep postgresql.service
 
 
-{% if salt['file.directory_exists']('/yarn-private') %}  # systemctl reenable does not work on ycloud so we create the symlink manually
+{% if pillar['subtype'] == 'Docker' %}  # systemctl reenable does not work on ycloud so we create the symlink manually
 create-postgres-service-link:
   cmd.run:
     - name: ln -sf /usr/lib/systemd/system/postgresql-10.service /usr/lib/systemd/system/postgresql.service && systemctl disable postgresql-10 && systemctl enable postgresql
@@ -250,7 +279,18 @@ init-pg-database:
 {% if pillar['subtype'] != 'Docker' %}
 start-postgresql:
   service.running:
+{% if  pillar['OS'] == 'redhat8' %}
+    - name: postgresql-11
+{% else %}
     - name: postgresql
+{% endif %}
+log-postgres-service-status:
+  cmd.run:
+{% if  pillar['OS'] == 'redhat8' %}
+    - name: systemctl status postgresql-11.service
+{% else %}
+    - name: systemctl status postgresql.service
+{% endif %}
 {% endif %}
 
 /opt/salt/scripts/conf_pgsql_listen_address.sh:
@@ -262,6 +302,8 @@ start-postgresql:
 configure-listen-address:
   cmd.run:
     - name: su postgres -c '/opt/salt/scripts/conf_pgsql_listen_address.sh' && echo $(date +%Y-%m-%d:%H:%M:%S) >> /var/log/pgsql_listen_address_configured
+    - env:
+      - SUBTYPE: {{ pillar['subtype'] }}
     - require:
       - file: /opt/salt/scripts/conf_pgsql_listen_address.sh
 {% if pillar['subtype'] != 'Docker' %}
@@ -272,3 +314,47 @@ set-postgres-nologin-shell:
   user.present:
     - name: postgres
     - shell: /usr/sbin/nologin
+
+# Needed for installing psycopg2 in saltstack/base/salt/postgresql/init.sls
+{% if '/usr/pgsql-11/bin' not in salt['environ.get']('PATH') %}
+/opt/salt/scripts/conf_pgconfig_path.sh:
+  file.managed:
+    - makedirs: True
+    - mode: 755
+    - source: salt://postgresql/scripts/conf_pgconfig_path.sh
+
+add-pgconfig-to-path:
+  cmd.run:
+    - name: /opt/salt/scripts/conf_pgconfig_path.sh
+    - require:
+      - file: /opt/salt/scripts/conf_pgconfig_path.sh
+
+set-path-pgsql11-bin:
+  environ.setenv:
+    - name: PATH
+    - value: "{{ salt['environ.get']('PATH') }}:/usr/pgsql-11/bin"
+    - update_minion: True
+{% endif %}
+
+# Install psycopg2 globally
+
+# CentOS 7 / RHEL 7 / RHEL 8 + Python 3.6
+psycopg2-centos7-py36:
+  pip.installed:
+    - name: psycopg2==2.9.3
+    - bin_env: /usr/local/bin/pip3
+    - onlyif: ls -la /usr/local/lib/python3.6/site-packages/
+
+# RHEL 8 + Python 3.8
+psycopg2-rhel8-py38:
+  pip.installed:
+    - name: psycopg2==2.9.3
+    - bin_env: /usr/local/bin/pip3.8
+    - onlyif: ls -la /usr/lib64/python3.8/site-packages
+
+# CentOS 7 + Python 3.8
+psycopg2-centos7-py38:
+  pip.installed:
+    - name: psycopg2==2.9.3
+    - bin_env: /opt/rh/rh-python38/root/usr/bin/pip3
+    - onlyif: ls -la /opt/rh/rh-python38/root/usr/lib/python3.8/site-packages/

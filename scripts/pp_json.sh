@@ -3,7 +3,7 @@
 set -xe
 
 if [ -f package-versions.json -a "$stack_version" != "" -a "$clustermanager_version" != "" ]; then
-    wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+    wget https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
     chmod +x jq-linux64
     mv jq-linux64 /bin/jq
 
@@ -80,6 +80,7 @@ cat  > ${image_name}_$metadata_filename_postfix.json <<EOF
 "package_versions": $(if [ -f package-versions.json ]; then cat package-versions.json; else echo "{}"; fi),
 "pre_warm_parcels": $(if [[ -z "$pre_warm_parcels" ]]; then echo null; else echo $pre_warm_parcels; fi),
 "pre_warm_csd": $(if [[ -z "$pre_warm_csd" ]]; then echo null; else echo $pre_warm_csd; fi)
+$(if [[ -f tags.json && $(cat tags.json) != "{}" ]]; then echo ,\"tags\": $(cat tags.json); fi)
 }
 EOF
 

@@ -9,14 +9,38 @@ then
   exit 1
 fi
 
-echo "Restoring image $IMAGE_NAME ($AMI_ID) from region $SOURCE_LOCATION to regions $AWS_AMI_REGIONS"
+
+echo "Installing jq..."
+yum install -q -y jq
+
+echo "Copying image $IMAGE_NAME ($AMI_ID) from region $SOURCE_LOCATION to regions $AWS_AMI_REGIONS"
 IMAGES=""
+
+declare -a JOBS
 
 function log() {
   echo "$(date --rfc-3339=seconds) $1"
 }
 
-function wait_for_image() {
+function exec_background() {
+  eval $1 & JOBS[$!]="$1"
+}
+
+function checking_jobs() {
+  local cmd
+  local status=0
+  for pid in ${!JOBS[@]}; do
+    cmd=${JOBS[${pid}]}
+    wait ${pid} ; JOBS[${pid}]=$?
+    if [[ ${JOBS[${pid}]} -ne 0 ]]; then
+      status=${JOBS[${pid}]}
+      log "[${pid}] Exited with status: ${status} | ${cmd}"
+    fi
+  done
+  return ${status}
+}
+
+function wait_for_image_and_check() {
   REGION=$1
   AMI_IN_REGION=$2
 
@@ -37,14 +61,64 @@ function wait_for_image() {
   log "Querying snapshots in region $REGION for image $AMI_IN_REGION"
   SNAPSHOT_IDS=$(aws ec2 describe-images --image-ids $AMI_IN_REGION --region $REGION --query "Images[*].BlockDeviceMappings[*].Ebs.SnapshotId" --output "text")
 
-  echo $SNAPSHOT_IDS | while read SNAPSHOT_ID
+  if [ "$MAKE_PUBLIC_SNAPSHOTS" == "yes" ]; then
+    echo $SNAPSHOT_IDS | while read SNAPSHOT_ID
+    do
+      log "Setting snapshot $SNAPSHOT_ID visibility to public in region $REGION for image $AMI_IN_REGION"
+      aws ec2 modify-snapshot-attribute --snapshot-id $SNAPSHOT_ID --region $REGION --create-volume-permission "Add=[{Group=all}]"
+    done
+  fi
+
+  if [ "$MAKE_PUBLIC_AMIS" == "yes" ]; then
+    log "Setting launch permissions to public in region $REGION for image $AMI_IN_REGION"
+    aws ec2 modify-image-attribute --image-id $AMI_IN_REGION --region $REGION --launch-permission "Add=[{Group=all}]"
+  elif [ -n "$AWS_AMI_ORG_ARN" ]; then
+    log "Setting launch permissions only for organization in region $REGION for image $AMI_IN_REGION"
+    aws ec2 modify-image-attribute --image-id $AMI_IN_REGION --region $REGION --launch-permission "Add=[{OrganizationArn=$AWS_AMI_ORG_ARN}]"
+  fi
+
+  IMAGESTATUS=""
+  for ((i=0; i<5; i++))
   do
-    log "Setting snapshot $SNAPSHOT_ID visibility to public in region $REGION for image $AMI_IN_REGION"
-    aws ec2 modify-snapshot-attribute --snapshot-id $SNAPSHOT_ID --region $REGION --create-volume-permission "Add=[{Group=all}]"
+    IMAGE_DESC=$(aws ec2 describe-images --region $REGION --image-ids $AMI_IN_REGION --output json)
+    IMAGE_AVAILABLE=$(echo $IMAGE_DESC | jq -r '.Images[0].State')
+
+    if [ "${IMAGE_AVAILABLE}" == "available" ]; then
+      log "The $AMI_IN_REGION in $REGION region is available, checking permissions..."
+      IMAGE_PUBLIC=$(echo $IMAGE_DESC | jq -r '.Images[0].Public')
+      if [ "$MAKE_PUBLIC_AMIS" == "yes" ]; then
+        if [ "${IMAGE_PUBLIC}" == "true" ]; then
+          log "The $AMI_IN_REGION in $REGION region is public"
+          IMAGESTATUS="OK"
+        fi
+      elif [ -n "$AWS_AMI_ORG_ARN" ]; then
+        IMAGE_PERMISSIONS=$(aws ec2 describe-image-attribute --region $REGION --image-id $AMI_IN_REGION --attribute launchPermission --output json)
+        IMAGE_ORGANIZATION_ARN=$(echo $IMAGE_PERMISSIONS | jq -r '.LaunchPermissions[0].OrganizationArn')
+        if [ "${IMAGE_PUBLIC}" == "false" ] && [ "${IMAGE_ORGANIZATION_ARN}" == "$AWS_AMI_ORG_ARN" ]; then
+          log "The $AMI_IN_REGION in $REGION region is only shared with an organization"
+          IMAGESTATUS="OK"
+        fi
+      else
+        if [ "${IMAGE_PUBLIC}" == "false" ]; then
+          log "The $AMI_IN_REGION in $REGION region is private"
+          IMAGESTATUS="OK"
+        fi
+      fi
+    fi
+
+    if [ "${IMAGESTATUS}" == "OK" ]; then
+      break
+    else
+      sleep 60
+    fi
   done
 
-  log "Setting launch permissions to public in region $REGION for image $AMI_IN_REGION"
-  aws ec2 modify-image-attribute --image-id $AMI_IN_REGION --region $REGION --launch-permission "Add=[{Group=all}]"
+  if [ "${IMAGESTATUS}" = "OK" ]; then 
+    log "The $AMI_IN_REGION in $REGION region is available and in correct state."
+  else
+    log "FAILURE | The $AMI_IN_REGION in $REGION region is not available or not in correct state."
+    exit 1
+  fi
 
   log "Copy operation in region $REGION for image $AMI_IN_REGION finished"
 }
@@ -59,14 +133,19 @@ do
     continue
   fi
 
-  AMI_IN_REGION=$(aws ec2 copy-image --source-image-id $AMI_ID --source-region $SOURCE_LOCATION --region $REGION --name $IMAGE_NAME --output "text")
-  log "Image copy started to region $REGION as $AMI_IN_REGION, waiting for its completion"
-
+  AMI_IN_REGION=$(aws ec2 describe-images --owners self --filters "Name=name,Values=$IMAGE_NAME" --region $REGION --query "Images[*].[ImageId]" --output "text")
+  if [ -n "$AMI_IN_REGION" ]
+  then
+    log "Image is already copied to region $REGION as $AMI_IN_REGION"
+  else
+    AMI_IN_REGION=$(aws ec2 copy-image --source-image-id $AMI_ID --source-region $SOURCE_LOCATION --region $REGION --name $IMAGE_NAME --output "text")
+    log "Image copy started to region $REGION as $AMI_IN_REGION, waiting for its completion"
+  fi
   IMAGES+="${REGION}=${AMI_IN_REGION},"
-  wait_for_image $REGION $AMI_IN_REGION &
+  exec_background "wait_for_image_and_check $REGION $AMI_IN_REGION"
 done
 
-wait
+checking_jobs|| exit 1
 
 IMAGES=${IMAGES%?} # remove trailing comma
 log "Image copied to regions: $IMAGES"

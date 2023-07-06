@@ -1,5 +1,6 @@
 {
   "variables": {
+    "base_name": "{{ env `BASE_NAME` }}",
     "mock": "{{ env `MOCK` }}",
     "description": "{{ env `DESCRIPTION` }}",
     "gcp_account_file": "{{env `GCP_ACCOUNT_FILE`}}",
@@ -79,10 +80,12 @@
     "repository_type": "{{ env `REPOSITORY_TYPE` }}",
     "sles_registration_code": "{{ env `SLES_REGISTRATION_CODE` }}",
     "package_versions" :  "{{ env `PACKAGE_VERSIONS` }}",
+    "tags": "{{ env `TAGS` }}",
     "python_apt_version" : "{{ env `PYTHON_APT_VERSION` }}",
     "salt_repo_file": "{{ env `SALT_REPO_FILE` }}",
     "aws_snapshot_groups": "{{ env `AWS_SNAPSHOT_GROUPS` }}",
     "aws_ami_groups": "{{ env `AWS_AMI_GROUPS` }}",
+    "aws_ami_org_arns": "{{ env `AWS_AMI_ORG_ARN` }}",
     "tag_customer_delivered": "{{ env `TAG_CUSTOMER_DELIVERED` }}",
     "version": "{{ env `VERSION` }}",
     "parcels_root": "{{ env `PARCELS_ROOT` }}",
@@ -102,12 +105,14 @@
     "metering_agent_rpm_url": "{{ env `METERING_AGENT_RPM_URL` }}",
     "freeipa_plugin_rpm_url": "{{ env `FREEIPA_PLUGIN_RPM_URL` }}",
     "freeipa_healthagent_rpm_url": "{{ env `FREEIPA_HEALTH_AGENT_RPM_URL` }}",
+    "freeipa_ldapagent_rpm_url": "{{ env `FREEIPA_LDAP_AGENT_RPM_URL` }}",
     "metadata_filename_postfix": "{{ env `METADATA_FILENAME_POSTFIX` }}",
     "gov_https_proxy": "{{ env `HTTPS_PROXY` }}",
     "gov_http_proxy": "{{ env `HTTP_PROXY` }}",
     "gov_no_proxy": "{{ env `NO_PROXY` }}",
     "image_uuid": "{{ env `IMAGE_UUID` }}",
-    "cloud_provider": "{{ env `CLOUD_PROVIDER` }}"
+    "cloud_provider": "{{ env `CLOUD_PROVIDER` }}",
+    "ssh_public_key": "{{ env `SSH_PUBLIC_KEY` }}"
   },
   "builders": [
     {
@@ -130,6 +135,91 @@
       "run_tags": {
         "owner": "{{ user `image_owner` }}"
       },
+      "ami_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "volume_type": "gp2",
+          "delete_on_termination": true,
+          "volume_size": "{{user `image_size`}}"
+        }
+      ],
+      "launch_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "volume_type": "gp2",
+          "delete_on_termination": true,
+          "volume_size": "{{user `image_size`}}"
+        }
+      ],
+      "ami_name": "{{ user `image_name`}}",
+      "subnet_id": "{{ user `subnet_id`}}",
+      "vpc_id": "{{ user `vpc_id`}}"
+    },
+    {
+      "name": "aws-redhat8",
+      "type": "amazon-ebs",
+      "region": "us-west-1",
+      "ssh_pty": true,
+      "source_ami": "ami-0b798df66a27251ec",
+      "instance_type": "{{ user `aws_instance_type` }}",
+      "ssh_username": "ec2-user",
+      "ena_support": true,
+      "skip_region_validation": true,
+      "tags": {
+        "builder": "packer",
+        "version": "{{user `version`}}",
+        "cb-creation-timestamp": "{{timestamp}}",
+        "owner": "{{ user `image_owner` }}",
+        "Customer Delivered": "{{user `tag_customer_delivered`}}"
+      },
+      "run_tags": {
+        "owner": "{{ user `image_owner` }}"
+      },
+      "snapshot_groups": "{{ user `aws_snapshot_groups` }}",
+      "ami_groups": "{{ user `aws_ami_groups` }}",
+      "ami_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "volume_type": "gp2",
+          "delete_on_termination": true,
+          "volume_size": "{{user `image_size`}}"
+        }
+      ],
+      "launch_block_device_mappings": [
+        {
+          "device_name": "/dev/sda1",
+          "volume_type": "gp2",
+          "delete_on_termination": true,
+          "volume_size": "{{user `image_size`}}"
+        }
+      ],
+      "ami_name": "{{ user `image_name`}}",
+      "subnet_id": "{{ user `subnet_id`}}",
+      "vpc_id": "{{ user `vpc_id`}}"
+    },
+    {
+      "name": "aws-gov-redhat8",
+      "type": "amazon-ebs",
+      "region": "us-gov-west-1",
+      "ssh_pty": true,
+      "source_ami": "ami-0ac4e06a69870e5be",
+      "instance_type": "{{ user `aws_instance_type` }}",
+      "ssh_username": "ec2-user",
+      "ena_support": true,
+      "skip_region_validation": true,
+      "tags": {
+        "builder": "packer",
+        "version": "{{user `version`}}",
+        "cb-creation-timestamp": "{{timestamp}}",
+        "owner": "{{ user `image_owner` }}",
+        "Customer Delivered": "{{user `tag_customer_delivered`}}"
+      },
+      "run_tags": {
+        "owner": "{{ user `image_owner` }}"
+      },
+      "snapshot_groups": "{{ user `aws_snapshot_groups` }}",
+      "ami_groups": "{{ user `aws_ami_groups` }}",
+      "ami_org_arns": "{{ user `aws_ami_org_arns` }}",
       "ami_block_device_mappings": [
         {
           "device_name": "/dev/sda1",
@@ -263,6 +353,47 @@
       }
     },
     {
+      "name": "arm-redhat8",
+      "type": "azure-arm",
+      "client_id": "{{user `client_id`}}",
+      "client_secret": "{{user `client_secret`}}",
+      "subscription_id": "{{user `subscription_id`}}",
+      "tenant_id": "{{user `tenant_id`}}",
+      "resource_group_name": "{{user `resource_group_name`}}",
+      "storage_account": "{{user `storage_account`}}",
+      "build_resource_group_name": "{{user `build_resource_group_name`}}",
+      "capture_container_name": "packer",
+      "capture_name_prefix": "{{user `image_name`}}",
+      "image_url": "{{ user `azure_image_vhd` }}",
+      "image_publisher": "{{user `azure_image_publisher`}}",
+      "image_offer": "{{user `azure_image_offer`}}",
+      "image_sku": "{{user `azure_image_sku`}}",
+      "ssh_pty": "true",
+      "username": "{{user `os_user`}}",
+      "os_type": "Linux",
+      "ssh_username": "centos",
+      "ssh_password": "{{user `ssh_password`}}",
+      "location": "{{user `arm_build_region`}}",
+      "vm_size": "Standard_D4",
+      "os_disk_size_gb": "{{user `image_size`}}",
+      "virtual_network_resource_group_name":"{{user `virtual_network_resource_group_name`}}",
+      "virtual_network_name": "{{user `vpc_id`}}",
+      "virtual_network_subnet_name": "{{user `subnet_id`}}",
+      "private_virtual_network_with_public_ip": "{{user `private_virtual_network_with_public_ip`}}",
+      "azure_tags": {
+        "builder": "packer",
+        "version": "{{user `version`}}",
+        "cb-creation-timestamp": "{{timestamp}}",
+        "Owner": "{{ user `image_owner` }}",
+        "Customer Delivered": "{{user `tag_customer_delivered`}}"
+      },
+      "plan_info": {
+        "plan_name": "rhel-lvm88",
+        "plan_product": "rhel-byos",
+        "plan_publisher": "redhat"
+      }
+    },
+    {
       "name": "gc-centos7",
       "type": "googlecompute",
       "disable_default_service_account" : true,
@@ -291,9 +422,73 @@
         "gcp-dev-cloudbreak-egress-internet-allow",
         "gcp-dev-cloudbreak-ingress-rfc1918-allow"
       ]
+    },
+    {
+      "name": "gc-redhat8",
+      "type": "googlecompute",
+      "disable_default_service_account" : true,
+      "account_file": "{{user `gcp_account_file`}}",
+      "source_image": "rhel-8-byos-v20230615",
+      "source_image_project_id": "rhel-byos-cloud",
+      "zone": "us-west2-a",
+      "project_id": "gcp-cdp-cb-images",
+      "network_project_id": "gcp-eng-network-enterprise",
+      "ssh_username": "centos",
+      "ssh_pty": "true",
+      "machine_type": "n1-standard-2",
+      "preemptible": false,
+      "omit_external_ip": "true",
+      "use_internal_ip": "true",
+      "network": "{{user `vpc_id`}}",
+      "subnetwork": "{{user `subnet_id`}}",
+      "image_name": "{{user `image_name`}}",
+      "disk_size": "{{user `image_size`}}",
+      "state_timeout": "15m",
+      "tags": [
+        "builder--packer",
+        "cb-creation-timestamp--{{timestamp}}",
+        "owner--{{ user `image_owner` | clean_resource_name }}",
+        "customer-delivered--{{user `tag_customer_delivered` | clean_resource_name}}",
+        "gcp-dev-cloudbreak-ingress-internet-deny",
+        "gcp-dev-cloudbreak-egress-internet-allow",
+        "gcp-dev-cloudbreak-ingress-rfc1918-allow"
+      ]
     }
   ],
   "provisioners": [
+    {
+      "type": "shell",
+      "script": "scripts/create-debug-user.sh",
+      "environment_vars": [
+        "SSH_PUBLIC_KEY={{ user `ssh_public_key` }}"
+      ],
+      "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}"
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "scripts/fips_mode_setup.sh"
+      ],
+      "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}",
+      "expect_disconnect": true,
+      "environment_vars": [
+        "OS={{user `os`}}",
+        "CLOUD_PROVIDER={{user `cloud_provider`}}"
+      ]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "scripts/storage_setup.sh",
+        "scripts/storage_final.sh"
+      ],
+      "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}",
+      "expect_disconnect": true,
+      "environment_vars": [
+        "OS={{user `os`}}",
+        "CLOUD_PROVIDER={{user `cloud_provider`}}"
+      ]
+    },
     {
       "type": "file",
       "source": "saltstack",
@@ -315,9 +510,16 @@
       "destination": "/tmp/hardcoded-packages.csv"
     },
     {
+      "type": "file",
+      "source": "scripts/rhel8_salt_fix.patch",
+      "destination": "/tmp/rhel8_salt_fix.patch"
+    },
+    {
       "type": "shell",
       "script": "scripts/generate-delta-package-list.sh",
       "environment_vars": [
+        "OS_TYPE={{user `os_type`}}",
+        "OS={{user `os`}}",
         "SALT_INSTALL_OS={{ user `salt_install_os` }}",
         "INSTALLATION_STATE=base"
       ],
@@ -327,9 +529,11 @@
       "type": "shell",
       "script": "scripts/salt-install.sh",
       "environment_vars": [
+        "IMAGE_BASE_NAME={{ user `base_name` }}",
         "SALT_INSTALL_OS={{ user `salt_install_os` }}",
         "SALT_INSTALL_REPO={{user `salt_install_repo` }}",
         "SALT_VERSION={{user `salt_version`}}",
+        "STACK_VERSION={{user `stack_version`}}",
         "PYZMQ_VERSION={{user `pyzmq_version`}}",
         "SLES_REGISTRATION_CODE={{user `sles_registration_code`}}",
         "OS_TYPE={{user `os_type`}}",
@@ -351,6 +555,7 @@
       "expect_disconnect": true,
       "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }} ",
       "environment_vars": [
+        "IMAGE_BASE_NAME={{ user `base_name` }}",
         "CUSTOM_IMAGE_TYPE={{user `custom_image_type`}}",
         "OS_USER={{ user `os_user` }}",
         "CLUSTERMANAGER_VERSION={{user `clustermanager_version`}}",
@@ -391,6 +596,7 @@
         "REPOSITORY_TYPE={{user `repository_type`}}",
         "SLES_REGISTRATION_CODE={{user `sles_registration_code`}}",
         "PACKAGE_VERSIONS={{user `package_versions`}}",
+        "TAGS={{user `tags`}}",
         "SALT_VERSION={{user `salt_version`}}",
         "SALT_PATH={{user `salt_path`}}",
         "PARCELS_ROOT={{ user `parcels_root` }}",
@@ -401,6 +607,7 @@
         "METERING_AGENT_RPM_URL={{ user `metering_agent_rpm_url` }}",
         "FREEIPA_PLUGIN_RPM_URL={{ user `freeipa_plugin_rpm_url` }}",
         "FREEIPA_HEALTH_AGENT_RPM_URL={{ user `freeipa_healthagent_rpm_url` }}",
+        "FREEIPA_LDAP_AGENT_RPM_URL={{ user `freeipa_ldapagent_rpm_url` }}",
         "HTTPS_PROXY={{ user `gov_https_proxy` }}",
         "HTTP_PROXY={{ user `gov_http_proxy` }}",
         "http_proxy={{ user `gov_http_proxy` }}",
@@ -414,6 +621,8 @@
       "type": "shell",
       "script": "scripts/generate-delta-package-list.sh",
       "environment_vars": [
+        "OS_TYPE={{user `os_type`}}",
+        "OS={{user `os`}}",
         "SALT_INSTALL_OS={{ user `salt_install_os` }}",
         "INSTALLATION_STATE=complete",
         "SALT_PATH={{user `salt_path`}}",
@@ -432,6 +641,12 @@
     },
     {
       "type": "file",
+      "source": "/tmp/tags.json",
+      "destination": "tags.json",
+      "direction" : "download"
+    },
+    {
+      "type": "file",
       "source": "/tmp/installed-delta-packages.csv",
       "destination": "installed-delta-packages.csv",
       "direction" : "download"
@@ -441,6 +656,31 @@
       "source": "/tmp/installed-full-packages.csv",
       "destination": "installed-full-packages.csv",
       "direction" : "download"
+    },
+    {
+      "type": "shell",
+      "script": "scripts/remove-debug-user.sh",
+      "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}"
+    },
+    {
+      "type": "shell",
+      "script": "scripts/cis_control.sh",
+      "environment_vars": [
+        "OS={{user `os`}}",
+        "IMAGE_BASE_NAME={{ user `base_name` }}",
+        "CLOUD_PROVIDER={{ user `cloud_provider` }}"
+      ],
+      "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}"
+    },
+    {
+      "type": "file",
+      "source": "/tmp/cis_log.txt",
+      "destination": "cis_log.txt",
+      "direction" : "download",
+      "only": [
+        "aws-redhat8",
+        "gc-redhat8"
+      ]
     }
   ],
   "post-processors": [

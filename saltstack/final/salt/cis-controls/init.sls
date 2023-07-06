@@ -7,13 +7,19 @@
 #### CIS: Disable unused filesystems
 #https://jira.cloudera.com/browse/CB-8897
 
-{% if pillar['OS'] == 'centos7' %}
+{% if pillar['OS'] == 'centos7' and pillar['subtype'] != 'Docker' %}
 
-# fat is required for gcp image
-# udf is required for Azure to mount cdrom - See CB-11012
-{% set filesystems = ['cramfs', 'freevxfs', 'jffs2', 'hfs', 'hfsplus', 'squashfs'] %}
+{% set filesystems_to_disable = ['cramfs', 'freevxfs', 'jffs2', 'hfs', 'hfsplus', 'squashfs'] %}
+{% if salt['environ.get']('CLOUD_PROVIDER') != 'Azure' %}
+  # udf is required for Azure to mount cdrom - See CB-11012
+  {% do filesystems_to_disable.append('udf') %}
+{% endif %}
+{% if salt['environ.get']('CLOUD_PROVIDER') != 'GCP' %}
+  # fat is required for gcp image
+  {% do filesystems_to_disable.append('fat') %}
+{% endif %}
 
-{% for fs in filesystems %}
+{% for fs in filesystems_to_disable %}
 
 {{ fs }} create modrobe blacklist:
     cmd.run:
@@ -95,12 +101,14 @@ sshd_harden_addressLoginGraceTime:
     - repl: "LoginGraceTime 60"
     - append_if_not_found: True
 
-#the value was kept as high as 1800, otherwise e2e test fails.
+# 235 is the max value for ClientAliveInterval allowed by Azure Marketplace,
+# however during the VM provisioning stage Cloudbreak will set this to 1800, 
+# which is essential for our own image validation process.
 sshd_harden_sshIdealTime_ClientAliveInterval:
   file.replace:
     - name: /etc/ssh/sshd_config
     - pattern: "^ClientAliveInterval.*"
-    - repl: "ClientAliveInterval 1800"
+    - repl: "ClientAliveInterval 180"
     - append_if_not_found: True
 sshd_harden_sshIdealTime_ClientAliveCountMax:
   file.replace:
@@ -116,25 +124,6 @@ sshd_harden_ssh2:
     - repl: "Protocol 2"
     - append_if_not_found: True
 
-sshd_local_WarnBanner1:
-  file.managed:
-    - name: /etc/issue
-    - contents: |
-        Corporate computer security personnel monitor this system for security purposes to ensure it remains available to all users and to protect information in the system. By accessing this system, you are expressly consenting to these monitoring activities.
-        Unauthorized attempts to defeat or circumvent security features, to use the system for other than intended purposes, to deny service to authorized users, to access, obtain, alter, damage, or destroy information, or otherwise to interfere with the system or its operation are prohibited. Evidence of such acts may be disclosed to law enforcement authorities and result in criminal prosecution under the Computer Fraud and Abuse Act of 1986 (Pub. L. 99-474) and the National Information Infrastructure Protection Act of 1996 (Pub. L. 104-294), (18 U.S.C. 1030), or other applicable criminal laws.
-sshd_local_WarnBanner2:
-  file.replace:
-    - name: /etc/ssh/sshd_config
-    - pattern: "^Banner.*"
-    - repl: "Banner /etc/issue.net"
-    - append_if_not_found: True
-
-sshd_remote_WarnBanner:
-  file.managed:
-    - name: /etc/issue.net
-    - contents: |
-        Corporate computer security personnel monitor this system for security purposes to ensure it remains available to all users and to protect information in the system. By accessing this system, you are expressly consenting to these monitoring activities.
-        Unauthorized attempts to defeat or circumvent security features, to use the system for other than intended purposes, to deny service to authorized users, to access, obtain, alter, damage, or destroy information, or otherwise to interfere with the system or its operation are prohibited. Evidence of such acts may be disclosed to law enforcement authorities and result in criminal prosecution under the Computer Fraud and Abuse Act of 1986 (Pub. L. 99-474) and the National Information Infrastructure Protection Act of 1996 (Pub. L. 104-294), (18 U.S.C. 1030), or other applicable criminal laws.
 sshd_harden_ApprovedCiphers:
   file.replace:
     - name: /etc/ssh/sshd_config
@@ -169,17 +158,6 @@ sshd_harden_MaxStartups:
     - pattern: "^maxstartups .*"
     - repl: "maxstartups 10:30:60"
     - append_if_not_found: True
-
-#Root user login via SSH needs to be disabled from version 7.2.8
-{% set version = salt['environ.get']('STACK_VERSION') %}
-{% if version and version.split('.') | map('int') | list >= [7, 2, 8] %}
-sshd_harden_PermitRootLogin:
-  file.replace:
-    - name: /etc/ssh/sshd_config
-    - pattern: "^PermitRootLogin.*"
-    - repl: "PermitRootLogin no"
-    - append_if_not_found: True
-{%- endif %}
 
 #### CIS: Sudo Configuration
 #1.3.2 Ensure sudo commands use pty
@@ -639,10 +617,6 @@ Umask027:
 Umask077:
   cmd.run:
     - name: "for TEMPLATE in 'bashrc' 'profile'; do sed -i 's|umask 022|umask 077|g' /etc/${TEMPLATE}; done"
-#Ensure default user shell timeout is 900 seconds or less
-TMOUT_profile:
-  cmd.run:
-    - name: printf "readonly TMOUT=900 ; export TMOUT" >> /etc/profile
 
 #### CIS: Ensure access to the su command is restricted
 #https://jira.cloudera.com/browse/CB-8929
@@ -658,5 +632,11 @@ update_pam.d_su:
     - pattern: '^auth\s*required\s*pam_wheel\.so.*'
     - repl: 'auth required pam_wheel.so use_uid'
     - append_if_not_found: True
+
+#### 2.2.18 Ensure rpcbind is not installed or the rpcbind services are masked - rpcbind
+#https://jira.cloudera.com/browse/CB-21585
+mask_rpcbind_service:
+ service.masked:
+   - name: rpcbind
 
 {% endif %}

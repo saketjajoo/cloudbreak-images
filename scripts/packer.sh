@@ -3,7 +3,8 @@
 packer_in_container() {
   local dockerOpts=""
   local packerFile="packer.json"
-  PACKER_VERSION="1.4.2"
+  : "${PACKER_VERSION:="1.4.2"}"
+  echo "Using Packer version $PACKER_VERSION"
 
   if [[ "$GCP_ACCOUNT_FILE" ]]; then
     dockerOpts="$dockerOpts -v $GCP_ACCOUNT_FILE:$GCP_ACCOUNT_FILE"
@@ -52,6 +53,14 @@ packer_in_container() {
       CDP_TELEMETRY_VERSION=$(curl -L -k -s ${CDP_TELEMETRY_BASE_URL}AVAILABLE_VERSIONS | head -1)
     fi
     CDP_TELEMETRY_RPM_URL="${CDP_TELEMETRY_BASE_URL}cdp_telemetry-${CDP_TELEMETRY_VERSION}.x86_64.rpm"
+    
+    ## The RPM_URL is overwritten due to FIPS compatibility
+    ## It will be deleted after the proper rpm will be available via the base url
+    if [[ "$CLOUD_PROVIDER" == "AWS_GOV" ]]; then
+      CDP_TELEMETRY_RPM_URL="https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/39697508/cdp-infra-tools/1.x/redhat8/yum/cdp_telemetry-0.4.36.x86_64.rpm"
+    else
+      CDP_TELEMETRY_RPM_URL="https://archive.cloudera.com/cdp-infra-tools/latest/redhat7/yum/cdp_telemetry-0.4.31.x86_64.rpm"
+    fi
   fi
   if [[ "$INCLUDE_FLUENT" == "Yes" && -z "$CDP_LOGGING_AGENT_RPM_URL" ]]; then
     CDP_LOGGING_AGENT_BASE_URL="https://cloudera-service-delivery-cache.s3.amazonaws.com/telemetry/cdp-logging-agent/"
@@ -59,10 +68,41 @@ packer_in_container() {
       CDP_LOGGING_AGENT_VERSION=$(curl -L -k -s ${CDP_LOGGING_AGENT_BASE_URL}AVAILABLE_VERSIONS | head -1)
     fi
     CDP_LOGGING_AGENT_RPM_URL="${CDP_LOGGING_AGENT_BASE_URL}${CDP_LOGGING_AGENT_VERSION}/cdp_logging_agent-${CDP_LOGGING_AGENT_VERSION}.x86_64.rpm"
+    
+    ## The RPM_URL is overwritten due to FIPS compatibility
+    ## It will be deleted after the proper rpm will be available via the base url
+    if [[ "$CLOUD_PROVIDER" == "AWS_GOV" ]]; then
+      CDP_LOGGING_AGENT_RPM_URL="https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/42375326/cdp-infra-tools/1.x/redhat8/yum/cdp_logging_agent-0.3.7.x86_64.rpm"
+    else
+      CDP_LOGGING_AGENT_RPM_URL="https://archive.cloudera.com/cdp-infra-tools/latest/redhat7/yum/cdp_logging_agent-0.3.6.x86_64.rpm"
+    fi
   fi
 
-  if ! [[  $JUMPGATE_AGENT_RPM_URL =~ ^http.*rpm$ ]]; then
+  if ! [[ $JUMPGATE_AGENT_RPM_URL =~ ^http.*rpm$ ]]; then
       export JUMPGATE_AGENT_RPM_URL=$DEFAULT_JUMPGATE_AGENT_RPM_URL
+  fi
+  if ! [[ $METERING_AGENT_RPM_URL =~ ^http.*rpm$ ]]; then
+    ## The RPM_URL is overwritten due to FIPS compatibility
+    ## It will be deleted after the proper rpm will be available via the base url
+    if [[ "$CLOUD_PROVIDER" == "AWS_GOV" ]]; then
+      METERING_AGENT_RPM_URL="https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/42626487/thunderhead/1.x/redhat8/yum/thunderhead-metering-heartbeat-application-2.0.0-b10713.x86_64.rpm"
+    else
+      export METERING_AGENT_RPM_URL=$DEFAULT_METERING_AGENT_RPM_URL
+    fi
+  fi
+  if ! [[ $FREEIPA_PLUGIN_RPM_URL =~ ^http.*rpm$ ]]; then
+    # The RHEL8 version is not backward-compatible, so we have to override the default CentOS 7 version.
+    if [[ "$OS" == "redhat8" ]]; then
+      export FREEIPA_PLUGIN_RPM_URL="https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/42085718/thunderhead/1.x/redhat8/yum/cdp-hashed-pwd-1.0-20230613035802git1c2c21d.el8.x86_64.rpm"
+    else
+      export FREEIPA_PLUGIN_RPM_URL=$DEFAULT_FREEIPA_PLUGIN_RPM_URL
+    fi
+  fi
+  if ! [[ $FREEIPA_HEALTH_AGENT_RPM_URL =~ ^http.*rpm$ ]]; then
+      export FREEIPA_HEALTH_AGENT_RPM_URL=$DEFAULT_FREEIPA_HEALTH_AGENT_RPM_URL
+  fi
+  if ! [[  $FREEIPA_LDAP_AGENT_RPM_URL =~ ^http.*rpm$ ]]; then
+      export FREEIPA_LDAP_AGENT_RPM_URL=$DEFAULT_FREEIPA_LDAP_AGENT_RPM_URL
   fi
 
   [[ "$TRACE" ]] && set -x
@@ -86,6 +126,7 @@ packer_in_container() {
     -e AWS_INSTANCE_PROFILE="$AWS_INSTANCE_PROFILE" \
     -e AWS_SNAPSHOT_GROUPS="$AWS_SNAPSHOT_GROUPS" \
     -e AWS_AMI_GROUPS="$AWS_AMI_GROUPS" \
+    -e AWS_AMI_ORG_ARN="$AWS_AMI_ORG_ARN" \
     -e AZURE_IMAGE_VHD=$AZURE_IMAGE_VHD \
     -e AZURE_IMAGE_PUBLISHER=$AZURE_IMAGE_PUBLISHER \
     -e AZURE_IMAGE_OFFER=$AZURE_IMAGE_OFFER \
@@ -149,6 +190,7 @@ packer_in_container() {
     -e REPOSITORY_TYPE="$REPOSITORY_TYPE" \
     -e SLES_REGISTRATION_CODE="$SLES_REGISTRATION_CODE" \
     -e PACKAGE_VERSIONS="$PACKAGE_VERSIONS" \
+    -e TAGS="$TAGS" \
     -e AWS_MAX_ATTEMPTS=$AWS_MAX_ATTEMPTS \
     -e SALT_VERSION="$SALT_VERSION" \
     -e SALT_PATH="$SALT_PATH" \
@@ -177,8 +219,10 @@ packer_in_container() {
     -e METERING_AGENT_RPM_URL="$METERING_AGENT_RPM_URL" \
     -e FREEIPA_PLUGIN_RPM_URL="$FREEIPA_PLUGIN_RPM_URL" \
     -e FREEIPA_HEALTH_AGENT_RPM_URL="$FREEIPA_HEALTH_AGENT_RPM_URL" \
+    -e FREEIPA_LDAP_AGENT_RPM_URL="$FREEIPA_LDAP_AGENT_RPM_URL" \
     -e IMAGE_UUID="$IMAGE_UUID" \
     -e CLOUD_PROVIDER="$CLOUD_PROVIDER" \
+    -e SSH_PUBLIC_KEY="$SSH_PUBLIC_KEY" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v $PWD:$PWD \
     -w $PWD \

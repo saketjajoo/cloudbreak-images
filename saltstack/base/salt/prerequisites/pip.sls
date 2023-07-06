@@ -5,39 +5,13 @@ install_openssl_devel:
       - openssl-devel
 {% endif %}
 
-{% if grains['os'] | upper == 'SUSE' %}
-update_python_pip2:
-  cmd.run:
-    - name: pip2 install --upgrade --index=https://pypi.python.org/simple/ pip==9.0.3
-    - onlyif: pip2 -V
-
-update_python_pip3:
-  cmd.run:
-    - name: pip3 install --upgrade --index=https://pypi.python.org/simple/ pip==9.0.3
-    - onlyif: pip3 -V
-
-{% elif grains['os'] != 'Amazon' and not salt['file.directory_exists']('/yarn-private') %}
-update_python_pip2:
-  cmd.run:
-    - name: pip2 install --upgrade --index=https://pypi.python.org/simple/ pip==8.1.2
-    - onlyif: pip2 -V
-
-update_python_pip3:
-  cmd.run:
-    - name: pip3 install --upgrade --index=https://pypi.python.org/simple/ pip==8.1.2
-    - onlyif: pip3 -V
-
-{% endif %}
-
 install_pyyaml:
-  cmd.run:
-    - name: pip install PyYAML --ignore-installed
-    - unless: pip list | grep -E 'PyYAML'
+  pip.installed:
+    - name: PyYAML
 
 install_jq:
   file.managed:
     - name: /usr/bin/jq
-    - source: https://stedolan.github.io/jq/download/linux64/jq
-    - source_hash: md5=89c7bb6138fa6a5c989aca6b71586acc
-    - skip_verify: True
+    - source: https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
+    - source_hash: sha256=af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44
     - mode: 755

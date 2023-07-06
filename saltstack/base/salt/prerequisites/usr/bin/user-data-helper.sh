@@ -22,6 +22,7 @@ IS_FREEIPA=true
 {% else %}
 IS_FREEIPA=false
 {% endif %}
+OS={{ pillar['OS'] }}
 
 source /usr/bin/ccmv2-helper.sh
 
@@ -219,6 +220,38 @@ create_saltapi_certificates() {
   rm -f /etc/salt/minion_id
 }
 
+resize_partitions() {
+  if [ $CLOUD_PLATFORM == "AZURE" ] && ([ $OS == "redhat7" ] || [ $OS == "redhat8" ]); then
+    if [ $OS == "redhat7" ]; then
+      # Relocating backup data structures to the end of the disk
+      printf "x\ne\nw\nY\n" | gdisk /dev/sda
+      # Resize /dev/sda4 to the end of the disk
+      parted -s -a opt /dev/sda "resizepart 4 100%"
+      # Resize physical volume
+      pvresize /dev/sda4
+      # Extend logical volumes to satisfy CM free space checks
+      lvextend -L35G -r /dev/mapper/rootvg-optlv
+      lvextend -L12G -r /dev/mapper/rootvg-varlv
+      lvextend -L12G -r /dev/mapper/rootvg-tmplv
+    elif [ $OS == "redhat8" ]; then
+      PV_NAME=$(pvs --noheadings --rows | head -1 | tr -d '[:space:]')
+      DISK=${PV_NAME//[0-9]/}
+      PARTITION=${PV_NAME//[^0-9]/}
+      # Relocating backup data structures to the end of the disk
+      printf "x\ne\nw\nY\n" | gdisk $DISK
+      # Resize partition to the end of the disk
+      parted -s -a opt $DISK "resizepart $PARTITION 100%"
+      # Resize physical volume
+      pvresize $PV_NAME
+      # Extend logical volumes to satisfy CM free space checks and allocate remaining free space
+      lvextend -L12G -r /dev/mapper/rootvg-varlv
+      lvextend -L12G -r /dev/mapper/rootvg-tmplv
+      # Extend root logical volume to remaining free space
+      lvextend -l +100%free -r /dev/mapper/rootvg-rootlv
+    fi
+  fi
+}
+
 main() {
   configure-salt-bootstrap
   reload_sysconf
@@ -260,22 +293,15 @@ main() {
       setup_ccmv2
     fi
 
-{% if pillar['OS'] == 'redhat7' %}
-    # Relocating backup data structures to the end of the disk
-    printf "x\ne\nw\nY\n" | gdisk /dev/sda
-    # Resize /dev/sda4 to the end of the disk
-    parted -s -a opt /dev/sda "resizepart 4 100%"
-    # Resize physical volume
-    pvresize /dev/sda4
-    # Extend logical volumes to satisfy CM free space checks
-    lvextend -L35G -r /dev/mapper/rootvg-optlv
-    lvextend -L12G -r /dev/mapper/rootvg-varlv
-    lvextend -L12G -r /dev/mapper/rootvg-tmplv
-{% endif %}
+    resize_partitions
 
     echo $(date +%Y-%m-%d:%H:%M:%S) >> /var/cb-init-executed
   fi
-  [ -e /usr/bin/ssh-aliases ] && /usr/bin/ssh-aliases create
+
+  # Fix root ssh access for pre-7.2.8
+  if [ -f /etc/motd-login ]; then
+    sed -i 's#command=".*" ssh-rsa#command="cat /etc/motd-login;sleep 5" ssh-rsa#' /root/.ssh/authorized_keys
+  fi
 }
 
 [[ "$0" == "$BASH_SOURCE" ]] && main "$@"

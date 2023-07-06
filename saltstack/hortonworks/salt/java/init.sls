@@ -9,8 +9,8 @@ set_java_home_user:
 set_java_home_systemd:
   file.replace:
     - name: /etc/systemd/system.conf
-    - pattern: \#+DefaultEnvironment=.*
-    - repl: DefaultEnvironment=JAVA_HOME={{ pillar['JAVA_HOME'] }}
+    - pattern: \#*(DefaultEnvironment=.*)
+    - repl: \1 JAVA_HOME={{ pillar['JAVA_HOME'] }}
 {% endif %}
 
 {% if grains['os_family'] == 'RedHat' %}
@@ -31,6 +31,26 @@ enable_redhat_rhui_repos:
 install_openjdk:
   pkg.installed:
     - pkgs: {{ pillar['openjdk_packages'] }}
+
+{% if pillar['OS'] == 'centos7' %}
+openjdk17-centos7:
+  archive.extracted:
+    - name: /usr/lib/jvm/
+    - source: https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz
+    - source_hash: sha256=0022753d0cceecacdd3a795dd4cea2bd7ffdf9dc06e22ffd1be98411742fbb44
+openjdk17-centos7-java-binary:
+  alternatives.install:
+    - name: java
+    - link: /usr/bin/java
+    - path: /usr/lib/jvm/jdk-17.0.2/bin/java
+    - priority: 1
+openjdk17-centos7-javac-binary:
+  alternatives.install:
+    - name: javac
+    - link: /usr/bin/javac
+    - path: /usr/lib/jvm/jdk-17.0.2/bin/javac
+    - priority: 1
+{% endif %}
 
 {% if grains['os_family'] == 'Debian' %}
 create_jvm_symlink:

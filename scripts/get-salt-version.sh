@@ -30,19 +30,19 @@ compare_version () {
 BASE_NAME=$1
 STACK_VERSION=$2
 
-SALT_VERSION=3000.8
+SALT_VERSION=3001.8
 
 if [[ $BASE_NAME == "cb" ]]; then
   if [[ ! -z "$STACK_VERSION" ]]; then
-    compare_version $STACK_VERSION 7.2.16
+    compare_version $STACK_VERSION 7.2.6
     COMP_RESULT=$?
-    # Stack version < 7.2.16
+    # Stack version < 7.2.6 - Lowered this from 7.2.16, because we'll need Python 3.8 on older images too
     if [[ $COMP_RESULT == 2 ]]; then
       SALT_VERSION=3000.8
     fi
   # Missing STACK_VERSION and BASE_NAME=cb -> base image
   else
-    SALT_VERSION=3000.8
+    SALT_VERSION=3001.8
   fi
 fi
 

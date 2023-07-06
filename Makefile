@@ -43,6 +43,10 @@ $(error "AZURE_IMAGE_VHD and Marketplace image properties (AZURE_IMAGE_PUBLISHER
 			AZURE_IMAGE_PUBLISHER ?= RedHat
 			AZURE_IMAGE_OFFER ?= RHEL
 			AZURE_IMAGE_SKU ?= 7_9
+		else ifeq ($(OS),redhat8)
+			AZURE_IMAGE_PUBLISHER ?= RedHat
+			AZURE_IMAGE_OFFER ?= rhel-byos
+			AZURE_IMAGE_SKU ?= rhel-lvm88
 		else ifeq ($(OS),centos7)
 			AZURE_IMAGE_PUBLISHER ?= OpenLogic
 			AZURE_IMAGE_OFFER ?= CentOS
@@ -91,16 +95,16 @@ ifeq ($(OS),centos7)
 	ifeq ($(CLOUD_PROVIDER),GCP)
 		IMAGE_SIZE ?= 48
 	endif
-	IMAGE_SIZE ?= 30
+	IMAGE_SIZE ?= 36
 else
 	IMAGE_SIZE ?= 64
 endif
 
-ifdef MAKE_PUBLIC_SNAPSHOTS
+ifeq ($(MAKE_PUBLIC_SNAPSHOTS),yes)
 	AWS_SNAPSHOT_GROUPS = "all"
 endif
 
-ifdef MAKE_PUBLIC_AMIS
+ifeq ($(MAKE_PUBLIC_AMIS),yes)
 	AWS_AMI_GROUPS = "all"
 endif
 
@@ -115,16 +119,29 @@ ARCHIVE_CREDENTIALS ?= ":"
 CDP_TELEMETRY_VERSION ?= ""
 CDP_LOGGING_AGENT_VERSION ?= ""
 
-DEFAULT_JUMPGATE_AGENT_RPM_URL := "https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/29318549/inverting-proxy/2.x/redhat7/yum/tars/inverting-proxy/jumpgate-agent.rpm"
+# This one is OS-independent (right?)
+DEFAULT_JUMPGATE_AGENT_RPM_URL := https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/41924420/jumpgate/3.x/redhat8/yum/jumpgate-agent.rpm
 
-ENVS=METADATA_FILENAME_POSTFIX=$(METADATA_FILENAME_POSTFIX) DESCRIPTION=$(DESCRIPTION) STACK_TYPE=$(STACK_TYPE) MPACK_URLS=$(MPACK_URLS) HDP_VERSION=$(HDP_VERSION) BASE_NAME=$(BASE_NAME) IMAGE_NAME=$(IMAGE_NAME) IMAGE_SIZE=$(IMAGE_SIZE) INCLUDE_CDP_TELEMETRY=$(INCLUDE_CDP_TELEMETRY) INCLUDE_FLUENT=$(INCLUDE_FLUENT) INCLUDE_METERING=$(INCLUDE_METERING) USE_TELEMETRY_ARCHIVE=$(USE_TELEMETRY_ARCHIVE) ARCHIVE_BASE_URL=$(ARCHIVE_BASE_URL) ARCHIVE_CREDENTIALS=$(ARCHIVE_CREDENTIALS) ENABLE_POSTPROCESSORS=$(ENABLE_POSTPROCESSORS) CUSTOM_IMAGE_TYPE=$(CUSTOM_IMAGE_TYPE) OPTIONAL_STATES=$(OPTIONAL_STATES) ORACLE_JDK8_URL_RPM=$(ORACLE_JDK8_URL_RPM) PREINSTALLED_JAVA_HOME=${PREINSTALLED_JAVA_HOME} IMAGE_OWNER=${IMAGE_OWNER} REPOSITORY_TYPE=${REPOSITORY_TYPE} PACKAGE_VERSIONS=$(PACKAGE_VERSIONS) SALT_VERSION=$(SALT_VERSION) SALT_PATH=$(SALT_PATH) PYZMQ_VERSION=$(PYZMQ_VERSION) PYTHON_APT_VERSION=$(PYTHON_APT_VERSION) AWS_MAX_ATTEMPTS=$(AWS_MAX_ATTEMPTS) TRACE=1 AWS_SNAPSHOT_GROUPS=$(AWS_SNAPSHOT_GROUPS) AWS_AMI_GROUPS=$(AWS_AMI_GROUPS) TAG_CUSTOMER_DELIVERED=$(TAG_CUSTOMER_DELIVERED) VERSION=$(VERSION) PARCELS_NAME=$(PARCELS_NAME) PARCELS_ROOT=$(PARCELS_ROOT) SUBNET_ID=$(SUBNET_ID) VPC_ID=$(VPC_ID) VIRTUAL_NETWORK_RESOURCE_GROUP_NAME=$(VIRTUAL_NETWORK_RESOURCE_GROUP_NAME) ARM_BUILD_REGION=$(ARM_BUILD_REGION) PRE_WARM_PARCELS=$(PRE_WARM_PARCELS) PRE_WARM_CSD=$(PRE_WARM_CSD) SLES_REGISTRATION_CODE=$(SLES_REGISTRATION_CODE) FLUENT_PREWARM_TAG=$(FLUENT_PREWARM_TAG) METERING_PREWARM_TAG=$(METERING_PREWARM_TAG) CDP_TELEMETRY_PREWARM_TAG=$(CDP_TELEMETRY_PREWARM_TAG) PREWARM_TAG=$(PREWARM_TAG) DEFAULT_JUMPGATE_AGENT_RPM_URL=$(DEFAULT_JUMPGATE_AGENT_RPM_URL) CLOUD_PROVIDER=$(CLOUD_PROVIDER)
+# This one is OS-independent for now, but newer versions won't be.
+DEFAULT_METERING_AGENT_RPM_URL := "https://archive.cloudera.com/cp_clients/thunderhead-metering-heartbeat-application-1.0.0-b8780.x86_64.rpm"
+
+# This one is theoretically OS-dependent and will be overridden in packer.sh for RHEL8, even though apparently packages work regardless of the OS.
+DEFAULT_FREEIPA_PLUGIN_RPM_URL := "https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/42085718/thunderhead/1.x/redhat8/yum/cdp-hashed-pwd-1.0-20230613035802git1c2c21d.el7.x86_64.rpm"
+
+# This one is OS-independent
+DEFAULT_FREEIPA_HEALTH_AGENT_RPM_URL := "https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/41404891/thunderhead/1.x/redhat8/yum/freeipa-health-agent-0.1-20230524185955gitcd308d4.x86_64.rpm"
+
+# This one is OS-independent
+DEFAULT_FREEIPA_LDAP_AGENT_RPM_URL := "https://cloudera-build-us-west-1.vpc.cloudera.com/s3/build/41404891/thunderhead/1.x/redhat8/yum/freeipa-ldap-agent-1.0.0-b10391.x86_64.rpm"
+
+ENVS=METADATA_FILENAME_POSTFIX=$(METADATA_FILENAME_POSTFIX) DESCRIPTION=$(DESCRIPTION) STACK_TYPE=$(STACK_TYPE) MPACK_URLS=$(MPACK_URLS) HDP_VERSION=$(HDP_VERSION) BASE_NAME=$(BASE_NAME) IMAGE_NAME=$(IMAGE_NAME) IMAGE_SIZE=$(IMAGE_SIZE) INCLUDE_CDP_TELEMETRY=$(INCLUDE_CDP_TELEMETRY) INCLUDE_FLUENT=$(INCLUDE_FLUENT) INCLUDE_METERING=$(INCLUDE_METERING) USE_TELEMETRY_ARCHIVE=$(USE_TELEMETRY_ARCHIVE) ARCHIVE_BASE_URL=$(ARCHIVE_BASE_URL) ARCHIVE_CREDENTIALS=$(ARCHIVE_CREDENTIALS) ENABLE_POSTPROCESSORS=$(ENABLE_POSTPROCESSORS) CUSTOM_IMAGE_TYPE=$(CUSTOM_IMAGE_TYPE) OPTIONAL_STATES=$(OPTIONAL_STATES) ORACLE_JDK8_URL_RPM=$(ORACLE_JDK8_URL_RPM) PREINSTALLED_JAVA_HOME=${PREINSTALLED_JAVA_HOME} IMAGE_OWNER=${IMAGE_OWNER} REPOSITORY_TYPE=${REPOSITORY_TYPE} PACKAGE_VERSIONS=$(PACKAGE_VERSIONS) SALT_VERSION=$(SALT_VERSION) SALT_PATH=$(SALT_PATH) PYZMQ_VERSION=$(PYZMQ_VERSION) PYTHON_APT_VERSION=$(PYTHON_APT_VERSION) AWS_MAX_ATTEMPTS=$(AWS_MAX_ATTEMPTS) TRACE=1 AWS_SNAPSHOT_GROUPS=$(AWS_SNAPSHOT_GROUPS) AWS_AMI_GROUPS=$(AWS_AMI_GROUPS) AWS_AMI_GROUPS=$(AWS_AMI_GROUPS) AWS_AMI_ORG_ARN=$(AWS_AMI_ORG_ARN) TAG_CUSTOMER_DELIVERED=$(TAG_CUSTOMER_DELIVERED) VERSION=$(VERSION) PARCELS_NAME=$(PARCELS_NAME) PARCELS_ROOT=$(PARCELS_ROOT) SUBNET_ID=$(SUBNET_ID) VPC_ID=$(VPC_ID) VIRTUAL_NETWORK_RESOURCE_GROUP_NAME=$(VIRTUAL_NETWORK_RESOURCE_GROUP_NAME) ARM_BUILD_REGION=$(ARM_BUILD_REGION) PRE_WARM_PARCELS=$(PRE_WARM_PARCELS) PRE_WARM_CSD=$(PRE_WARM_CSD) SLES_REGISTRATION_CODE=$(SLES_REGISTRATION_CODE) FLUENT_PREWARM_TAG=$(FLUENT_PREWARM_TAG) METERING_PREWARM_TAG=$(METERING_PREWARM_TAG) CDP_TELEMETRY_PREWARM_TAG=$(CDP_TELEMETRY_PREWARM_TAG) PREWARM_TAG=$(PREWARM_TAG) DEFAULT_JUMPGATE_AGENT_RPM_URL=$(DEFAULT_JUMPGATE_AGENT_RPM_URL) DEFAULT_METERING_AGENT_RPM_URL=$(DEFAULT_METERING_AGENT_RPM_URL) DEFAULT_FREEIPA_PLUGIN_RPM_URL=$(DEFAULT_FREEIPA_PLUGIN_RPM_URL) DEFAULT_FREEIPA_HEALTH_AGENT_RPM_URL=$(DEFAULT_FREEIPA_HEALTH_AGENT_RPM_URL) DEFAULT_FREEIPA_LDAP_AGENT_RPM_URL=$(DEFAULT_FREEIPA_LDAP_AGENT_RPM_URL) CLOUD_PROVIDER=$(CLOUD_PROVIDER) SSH_PUBLIC_KEY="$(SSH_PUBLIC_KEY)"
 
 GITHUB_ORG ?= hortonworks
 GITHUB_REPO ?= cloudbreak-images-metadata
 
 # it testing, atlas uploads should go to mocking artifact slush
 #PACKER_VARS=
-GIT_REV=$(shell git rev-parse --short HEAD)
+GIT_REV=$(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 GIT_TAG=$(shell git describe --exact-match --tags 2>/dev/null)
 
@@ -151,7 +168,7 @@ endef
 
 ifndef AWS_AMI_REGIONS
 define AWS_AMI_REGIONS
-ap-northeast-1,ap-northeast-2,ap-south-1,ap-southeast-1,ap-southeast-2,ap-southeast-3,ca-central-1,eu-central-1,eu-west-1,eu-west-2,eu-west-3,sa-east-1,us-east-1,us-east-2,us-west-1,us-west-2,eu-north-1,eu-south-1,af-south-1,me-south-1,ap-east-1
+ap-northeast-1,ap-northeast-2,ap-south-1,ap-southeast-1,ap-southeast-2,ap-southeast-3,ca-central-1,eu-central-1,eu-west-1,eu-west-2,eu-west-3,sa-east-1,us-east-1,us-east-2,us-west-1,us-west-2,eu-north-1,eu-south-1,af-south-1,me-south-1,ap-east-1,eu-south-2,eu-central-2,me-central-1
 endef
 endif
 
@@ -228,6 +245,65 @@ build-aws-centos7:
 	GIT_TAG=$(GIT_TAG) \
 	./scripts/sparseimage/packer.sh build -color=false -force $(PACKER_OPTS)
 
+generate-aws-centos7-changelog:
+ifdef IMAGE_UUID
+ifdef SOURCE_IMAGE
+	$(ENVS) \
+	OS=centos \
+	IMAGE_UUID=$(IMAGE_UUID) \
+	SOURCE_IMAGE=$(SOURCE_IMAGE) \
+	./scripts/changelog/packer.sh build -color=false -only=aws-centos7 -force $(PACKER_OPTS)
+endif
+endif
+
+build-aws-redhat8:
+	$(ENVS) \
+	AWS_AMI_REGIONS="us-west-1" \
+	OS=redhat8 \
+	OS_TYPE=redhat8 \
+	ATLAS_ARTIFACT_TYPE=amazon \
+	SALT_INSTALL_OS=redhat \
+	GIT_REV=$(GIT_REV) \
+	GIT_BRANCH=$(GIT_BRANCH) \
+	GIT_TAG=$(GIT_TAG) \
+	./scripts/packer.sh build -color=false -only=aws-redhat8 $(PACKER_OPTS)
+
+build-azure-redhat8:
+	$(ENVS) \
+	AZURE_STORAGE_ACCOUNTS=$(AZURE_BUILD_STORAGE_ACCOUNT) \
+	OS=redhat8 \
+	OS_TYPE=redhat8 \
+	ATLAS_ARTIFACT_TYPE=azure-arm \
+	SALT_INSTALL_OS=redhat \
+	AZURE_IMAGE_VHD=$(AZURE_IMAGE_VHD) \
+	AZURE_IMAGE_PUBLISHER=$(AZURE_IMAGE_PUBLISHER) \
+	AZURE_IMAGE_OFFER=$(AZURE_IMAGE_OFFER) \
+	AZURE_IMAGE_SKU=$(AZURE_IMAGE_SKU) \
+	BUILD_RESOURCE_GROUP_NAME=$(BUILD_RESOURCE_GROUP_NAME) \
+	PRIVATE_VIRTUAL_NETWORK_WITH_PUBLIC_IP=$(PRIVATE_VIRTUAL_NETWORK_WITH_PUBLIC_IP) \
+	GIT_REV=$(GIT_REV) \
+	GIT_BRANCH=$(GIT_BRANCH) \
+	GIT_TAG=$(GIT_TAG) \
+	./scripts/packer.sh build -color=false -only=arm-redhat8 $(PACKER_OPTS)
+ifeq ($(AZURE_INITIAL_COPY),true)
+	TRACE=1 AZURE_STORAGE_ACCOUNTS=$(AZURE_BUILD_STORAGE_ACCOUNT) ./scripts/azure-copy.sh
+endif
+
+build-gc-redhat8:
+	@ METADATA_FILENAME_POSTFIX=$(METADATA_FILENAME_POSTFIX)
+	$(ENVS) \
+	OS=redhat8 \
+	OS_TYPE=redhat8 \
+	GCP_AMI_REGIONS=$(GCP_AMI_REGIONS) \
+	ATLAS_ARTIFACT_TYPE=google \
+	GCP_STORAGE_BUNDLE=$(GCP_STORAGE_BUNDLE) \
+	GCP_STORAGE_BUNDLE_LOG=$(GCP_STORAGE_BUNDLE_LOG) \
+	SALT_INSTALL_OS=redhat \
+	GIT_REV=$(GIT_REV) \
+	GIT_BRANCH=$(GIT_BRANCH) \
+	GIT_TAG=$(GIT_TAG) \
+	./scripts/packer.sh build -color=false -only=gc-redhat8 $(PACKER_OPTS)
+
 copy-aws-images:
 	docker run -i --rm \
 		-v "${PWD}/scripts:/scripts" \
@@ -237,6 +313,9 @@ copy-aws-images:
 		-e AWS_AMI_REGIONS=$(AWS_AMI_REGIONS) \
 		-e IMAGE_NAME=$(IMAGE_NAME) \
 		-e SOURCE_LOCATION=$(SOURCE_LOCATION) \
+		-e MAKE_PUBLIC_AMIS=$(MAKE_PUBLIC_AMIS) \
+		-e MAKE_PUBLIC_SNAPSHOTS=$(MAKE_PUBLIC_SNAPSHOTS) \
+		-e AWS_AMI_ORG_ARN=$(AWS_AMI_ORG_ARN) \
 		--entrypoint="/bin/bash" \
 		amazon/aws-cli -c "./aws-copy.sh"
 
@@ -268,6 +347,33 @@ build-aws-gov-centos7:
 	NO_PROXY=172.20.0.0/16,127.0.0.1,localhost,169.254.169.254,internal,local,s3.us-gov-west-1.amazonaws.com,us-gov-west-1.eks.amazonaws.com \
 	./scripts/sparseimage/packer.sh build -color=false -force $(PACKER_OPTS)
 
+build-aws-gov-redhat8:
+	$(ENVS) \
+	AWS_AMI_REGIONS="us-gov-west-1" \
+	OS=redhat8 \
+	OS_TYPE=redhat8 \
+	ATLAS_ARTIFACT_TYPE=amazon-gov \
+	SALT_INSTALL_OS=redhat \
+	GIT_REV=$(GIT_REV) \
+	GIT_BRANCH=$(GIT_BRANCH) \
+	GIT_TAG=$(GIT_TAG) \
+	HTTPS_PROXY=http://usgw1-egress.gov-dev.cloudera.com:3128 \
+	HTTP_PROXY=http://usgw1-egress.gov-dev.cloudera.com:3128 \
+	NO_PROXY=172.20.0.0/16,127.0.0.1,localhost,169.254.169.254,internal,local,s3.us-gov-west-1.amazonaws.com,us-gov-west-1.eks.amazonaws.com \
+	PACKER_VERSION="1.8.3" \
+	./scripts/packer.sh build -color=false -only=aws-gov-redhat8 $(PACKER_OPTS)
+
+generate-aws-gov-centos7-changelog:
+ifdef IMAGE_UUID
+ifdef SOURCE_IMAGE
+	$(ENVS) \
+	OS=centos \
+	IMAGE_UUID=$(IMAGE_UUID) \
+	SOURCE_IMAGE=$(SOURCE_IMAGE) \
+	./scripts/changelog/packer.sh build -color=false -only=aws-gov-centos7 -force $(PACKER_OPTS)
+endif
+endif
+
 copy-aws-gov-images:
 	docker run -i --rm \
 		-v "${PWD}/scripts:/scripts" \
@@ -277,6 +383,9 @@ copy-aws-gov-images:
 		-e AWS_AMI_REGIONS=$(AWS_GOV_AMI_REGIONS) \
 		-e IMAGE_NAME=$(IMAGE_NAME) \
 		-e SOURCE_LOCATION=$(SOURCE_LOCATION) \
+		-e MAKE_PUBLIC_AMIS=$(MAKE_PUBLIC_AMIS) \
+		-e MAKE_PUBLIC_SNAPSHOTS=$(MAKE_PUBLIC_SNAPSHOTS) \
+		-e AWS_AMI_ORG_ARN=$(AWS_AMI_ORG_ARN) \
 		--entrypoint="/bin/bash" \
 		amazon/aws-cli -c "./aws-copy.sh"
 
@@ -285,6 +394,7 @@ build-gc-tar-file:
 	GCP_AMI_REGIONS=$(GCP_AMI_REGIONS) \
 	GCP_STORAGE_BUNDLE=$(GCP_STORAGE_BUNDLE) \
 	GCP_STORAGE_BUNDLE_LOG=$(GCP_STORAGE_BUNDLE_LOG) \
+	STACK_VERSION=$(STACK_VERSION) \
 	./scripts/bundle-gcp-image.sh
 
 build-gc-centos7:
@@ -301,6 +411,17 @@ build-gc-centos7:
 	GIT_BRANCH=$(GIT_BRANCH) \
 	GIT_TAG=$(GIT_TAG) \
 	./scripts/packer.sh build -color=false -only=gc-centos7 $(PACKER_OPTS)
+
+generate-gc-centos7-changelog:
+ifdef IMAGE_UUID
+ifdef SOURCE_IMAGE
+	$(ENVS) \
+	OS=centos \
+	IMAGE_UUID=$(IMAGE_UUID) \
+	SOURCE_IMAGE=$(SOURCE_IMAGE) \
+	./scripts/changelog/packer.sh build -color=false -only=gc-centos7 -force $(PACKER_OPTS)
+endif
+endif
 
 build-azure-centos7:
 	$(ENVS) \
@@ -343,6 +464,21 @@ build-azure-redhat7:
 ifeq ($(AZURE_INITIAL_COPY),true)
 	TRACE=1 AZURE_STORAGE_ACCOUNTS=$(AZURE_BUILD_STORAGE_ACCOUNT) ./scripts/azure-copy.sh
 endif
+
+generate-azure-centos7-changelog:
+ifdef IMAGE_UUID
+ifdef SOURCE_IMAGE
+	$(ENVS) \
+	OS=centos \
+	IMAGE_UUID=$(IMAGE_UUID) \
+	SOURCE_IMAGE=$(SOURCE_IMAGE) \
+	BUILD_RESOURCE_GROUP_NAME=$(BUILD_RESOURCE_GROUP_NAME) \
+	./scripts/changelog/packer.sh build -color=false -only=arm-centos7 -force $(PACKER_OPTS)
+endif
+endif
+
+get-azure-storage-accounts:
+	@ AZURE_STORAGE_ACCOUNTS="$(AZURE_STORAGE_ACCOUNTS)" TARGET_LOCATIONS="$(TARGET_LOCATIONS)" ./scripts/get-azure-storage-accounts.sh
 
 copy-azure-images:
 	TRACE=1 AZURE_STORAGE_ACCOUNTS="$(AZURE_STORAGE_ACCOUNTS)" AZURE_IMAGE_NAME="$(AZURE_IMAGE_NAME)" ./scripts/azure-copy.sh
@@ -421,6 +557,14 @@ ifdef UUID
 	cp -- installed-delta-packages.csv "${UUID}-manifest.csv"
 	AWS_DEFAULT_REGION=eu-west-1
 	aws s3 cp "${UUID}-manifest.csv" s3://cloudbreak-imagecatalog/image-manifests/ --acl public-read
+endif
+
+copy-changelog-to-s3-bucket:
+ifdef IMAGE_UUID_1
+ifdef IMAGE_UUID_2
+	AWS_DEFAULT_REGION=eu-west-1
+	aws s3 cp "${IMAGE_UUID_1}-to-${IMAGE_UUID_2}-changelog.txt" s3://cloudbreak-imagecatalog/image-changelogs/ --acl public-read
+endif
 endif
 
 generate-last-metadata-url-file:

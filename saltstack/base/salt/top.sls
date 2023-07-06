@@ -5,6 +5,7 @@ base:
     - cloud-init
 {% endif %}
     - nginx
+    - python3
     - salt-bootstrap
     - salt
     - postgresql
@@ -15,6 +16,6 @@ base:
     - ccmv2
     - custom
     - mount
-{% if not salt['file.directory_exists']('/yarn-private') %}
+{% if pillar['subtype'] != 'Docker' %}
     - chrony
 {% endif %}
